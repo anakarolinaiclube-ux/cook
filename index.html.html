@@ -164,88 +164,73 @@
         }
 
         // --- LÓGICA DE GERAÇÃO COM GOOGLE GEMINI ---
-        async function suggestRecipes() {
-            const input = document.getElementById('ingredients-input').value;
+async function suggestRecipes() {
+    const input = document.getElementById('ingredients-input').value;
 
-            if(!input.trim()) {
-                alert("Por favor, digite alguns ingredientes!");
-                return;
+    if(!input.trim()) {
+        alert("Por favor, digite alguns ingredientes!");
+        return;
+    }
+
+    // UI Update: Loading
+    document.getElementById('loading').classList.replace('hidden', 'flex');
+    document.getElementById('results-area').classList.add('hidden');
+    document.getElementById('shopping-list-container').classList.add('hidden');
+
+    const prompt = `
+        Você é um chef criativo. Com base EXCLUSIVAMENTE nestes ingredientes: "${input}", sugira 5 receitas possíveis.
+        
+        Instruções:
+        - Retorne APENAS um JSON válido (sem markdown, sem crases).
+        - Estrutura:
+        [
+            {
+                "title": "Nome",
+                "missing": ["item1", "item2"],
+                "steps": ["passo 1", "passo 2"]
             }
+        ]
+        - O campo "missing" deve conter apenas ingredientes importantes que o usuário não citou.
+        - Português do Brasil.
+    `;
 
-            if(API_KEY === "AIzaSyAgZe3Kd2_2gOhlaDiWvZfXiB1GLQmGftw" || API_KEY === "") {
-                alert("ERRO DE CONFIGURAÇÃO:\n\nVocê precisa abrir o arquivo index.html e inserir sua API Key do Google Gemini na variável const API_KEY.");
-                return;
-            }
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
 
-            // UI Update: Loading
-            document.getElementById('loading').classList.replace('hidden', 'flex');
-            document.getElementById('results-area').classList.add('hidden');
-            document.getElementById('shopping-list-container').classList.add('hidden');
+        const data = await response.json();
 
-            // 1. Montar o Prompt para o Gemini
-            const prompt = `
-                Você é um chef criativo. Com base EXCLUSIVAMENTE nestes ingredientes: "${input}", sugira 5 receitas possíveis.
-                
-                Instruções Estritas:
-                1. Retorne APENAS um JSON válido. Não use Markdown. Não use crase (\`\`\`). Não coloque introdução.
-                2. O JSON deve ser um Array de objetos com a estrutura:
-                [
-                    {
-                        "title": "Nome da Receita",
-                        "missing": ["Item que falta 1", "Item que falta 2"], 
-                        "steps": ["Passo 1", "Passo 2", "Passo 3"]
-                    }
-                ]
-                3. No campo "missing", liste apenas ingredientes essenciais que não foram citados no input.
-                4. O idioma deve ser Português do Brasil.
-            `;
+        let rawText =
+            data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-            try {
-                // 2. Chamar a API do Google Gemini (Endpoint REST)
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-                
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }]
-                    })
-                });
+        // LIMPA json
+        rawText = rawText
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim();
 
-                if (!response.ok) {
-                    throw new Error("Falha na comunicação com a API do Google.");
-                }
+        currentRecipes = JSON.parse(rawText);
 
-                const data = await response.json();
-                
-                // Extrair o texto da resposta do Gemini
-                let rawText = data.candidates[0].content.parts[0].text;
+        renderRecipes();
 
-                // 3. Limpeza e Tratamento do JSON
-                // O Gemini as vezes coloca ```json no começo e ``` no fim. Removemos isso.
-                let cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                
-                // Parse seguro
-                currentRecipes = JSON.parse(cleanJson);
+        document.getElementById('loading').classList.replace('flex', 'hidden');
+        document.getElementById('results-area').classList.remove('hidden');
+        document.getElementById('results-area').scrollIntoView({ behavior: 'smooth' });
 
-                // Renderiza
-                renderRecipes();
-                
-                // Exibe resultados
-                document.getElementById('loading').classList.replace('flex', 'hidden');
-                document.getElementById('results-area').classList.remove('hidden');
-                document.getElementById('results-area').scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+        console.error("Erro detalhado:", error);
+        document.getElementById('loading').classList.replace('flex', 'hidden');
+        alert("Erro ao gerar receitas. Verifique se sua chave está ativa.");
+    }
+}
 
-            } catch (error) {
-                console.error("Erro detalhado:", error);
-                document.getElementById('loading').classList.replace('flex', 'hidden');
-                alert("Ocorreu um erro ao gerar as receitas.\nVerifique se sua API Key é válida e se tem cota disponível.");
-            }
-        }
 
         // Renderizar Cards
         function renderRecipes() {
