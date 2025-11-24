@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CookMe – Assistente de Refeições</title>
+    
+    <!-- Fonte Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Biblioteca para PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            black: '#1a1a1a',
+                            green: '#10B981', // Emerald 500
+                            darkGreen: '#059669',
+                            light: '#F3F4F6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #ffffff;
+            color: #1a1a1a;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loader {
+            border-top-color: #10B981;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar Simples -->
+    <nav class="w-full py-6 px-8 flex justify-between items-center max-w-6xl mx-auto">
+        <div class="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <i class="fa-solid fa-leaf text-brand-green"></i> CookMe
+        </div>
+    </nav>
+
+    <!-- TELA 1: HOME / LANDING -->
+    <section id="landing-page" class="flex-grow flex flex-col items-center justify-center text-center px-4 fade-in">
+        <div class="max-w-2xl space-y-6">
+            <h1 class="text-5xl font-bold leading-tight">
+                Cozinhe melhor com o que <span class="text-brand-green">você já tem.</span>
+            </h1>
+            <p class="text-gray-500 text-lg max-w-md mx-auto">
+                O CookMe é seu assistente inteligente. Digite os ingredientes que tem em casa, receba sugestões incríveis e gere sua lista de compras em segundos.
+            </p>
+            <button onclick="goToDashboard()" class="mt-8 px-8 py-4 bg-brand-black text-white rounded-full font-medium hover:bg-brand-green transition-all transform hover:scale-105 shadow-lg">
+                Ir para o CookMe <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+    </section>
+
+    <!-- TELA 2: DASHBOARD -->
+    <section id="dashboard" class="hidden max-w-5xl mx-auto px-4 py-8 w-full fade-in pb-20">
+        
+        <!-- Input Central -->
+        <div class="bg-gray-50 rounded-3xl p-8 shadow-sm border border-gray-100 mb-12 text-center">
+            <h2 class="text-2xl font-semibold mb-4">O que tem na sua geladeira?</h2>
+            <div class="relative max-w-xl mx-auto">
+                <input type="text" id="ingredients-input" placeholder="Ex: frango, arroz, tomate, cebola..." 
+                    class="w-full p-4 pl-6 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-green shadow-sm text-lg transition-all">
+            </div>
+            <button onclick="suggestRecipes()" class="mt-6 px-8 py-3 bg-brand-green text-white rounded-xl font-medium hover:bg-brand-darkGreen transition-all shadow-md hover:shadow-lg">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Sugerir Receitas
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden flex-col items-center justify-center py-12">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+            <p class="text-gray-500 animate-pulse">A IA está criando receitas deliciosas...</p>
+        </div>
+
+        <!-- Resultados -->
+        <div id="results-area" class="hidden">
+            
+            <div class="flex justify-between items-end mb-6">
+                <h3 class="text-xl font-bold">Sugestões para você</h3>
+                <button onclick="exportPDF()" class="text-sm text-gray-500 hover:text-brand-green underline">
+                    <i class="fa-solid fa-file-pdf mr-1"></i> Exportar tudo em PDF
+                </button>
+            </div>
+
+            <!-- Grid de Receitas -->
+            <div id="recipes-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                <!-- Cards serão inseridos aqui via JS -->
+            </div>
+
+            <!-- Área da Lista de Compras -->
+            <div class="text-center mb-8">
+                <button onclick="generateShoppingList()" id="btn-shopping-list" class="px-8 py-3 border-2 border-brand-black text-brand-black rounded-xl font-medium hover:bg-brand-black hover:text-white transition-all">
+                    <i class="fa-solid fa-basket-shopping mr-2"></i> Gerar lista de compras
+                </button>
+            </div>
+
+            <!-- Container da Lista de Compras (Gerado) -->
+            <div id="shopping-list-container" class="hidden bg-brand-black text-white rounded-3xl p-8 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-brand-green rounded-full opacity-20 blur-2xl"></div>
+                
+                <h3 class="text-2xl font-bold mb-6 border-b border-gray-700 pb-4">Lista de Compras</h3>
+                
+                <div id="shopping-list-content" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Categorias serão inseridas aqui -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-6 text-center text-gray-400 text-sm mt-auto">
+        &copy; 2023 CookMe. Minimalista & Inteligente.
+    </footer>
+
+    <!-- Lógica do Sistema -->
+    <script>
+        // ==========================================
+        // CONFIGURAÇÃO DA API KEY (GOOGLE GEMINI)
+        // ==========================================
+        const API_KEY = "SUA_CHAVE_AQUI"; 
+        // ==========================================
+
+        let currentRecipes = [];
+
+        // Navegação
+        function goToDashboard() {
+            document.getElementById('landing-page').classList.add('hidden');
+            const dashboard = document.getElementById('dashboard');
+            dashboard.classList.remove('hidden');
+        }
+
+        // --- LÓGICA DE GERAÇÃO COM GOOGLE GEMINI ---
+        async function suggestRecipes() {
+            const input = document.getElementById('ingredients-input').value;
+
+            if(!input.trim()) {
+                alert("Por favor, digite alguns ingredientes!");
+                return;
+            }
+
+            if(API_KEY === "SUA_CHAVE_AQUI" || API_KEY === "") {
+                alert("ERRO DE CONFIGURAÇÃO:\n\nVocê precisa abrir o arquivo index.html e inserir sua API Key do Google Gemini na variável const API_KEY.");
+                return;
+            }
+
+            // UI Update: Loading
+            document.getElementById('loading').classList.replace('hidden', 'flex');
+            document.getElementById('results-area').classList.add('hidden');
+            document.getElementById('shopping-list-container').classList.add('hidden');
+
+            // 1. Montar o Prompt para o Gemini
+            const prompt = `
+                Você é um chef criativo. Com base EXCLUSIVAMENTE nestes ingredientes: "${input}", sugira 5 receitas possíveis.
+                
+                Instruções Estritas:
+                1. Retorne APENAS um JSON válido. Não use Markdown. Não use crase (\`\`\`). Não coloque introdução.
+                2. O JSON deve ser um Array de objetos com a estrutura:
+                [
+                    {
+                        "title": "Nome da Receita",
+                        "missing": ["Item que falta 1", "Item que falta 2"], 
+                        "steps": ["Passo 1", "Passo 2", "Passo 3"]
+                    }
+                ]
+                3. No campo "missing", liste apenas ingredientes essenciais que não foram citados no input.
+                4. O idioma deve ser Português do Brasil.
+            `;
+
+            try {
+                // 2. Chamar a API do Google Gemini (Endpoint REST)
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+                
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Falha na comunicação com a API do Google.");
+                }
+
+                const data = await response.json();
+                
+                // Extrair o texto da resposta do Gemini
+                let rawText = data.candidates[0].content.parts[0].text;
+
+                // 3. Limpeza e Tratamento do JSON
+                // O Gemini as vezes coloca ```json no começo e ``` no fim. Removemos isso.
+                let cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                // Parse seguro
+                currentRecipes = JSON.parse(cleanJson);
+
+                // Renderiza
+                renderRecipes();
+                
+                // Exibe resultados
+                document.getElementById('loading').classList.replace('flex', 'hidden');
+                document.getElementById('results-area').classList.remove('hidden');
+                document.getElementById('results-area').scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error("Erro detalhado:", error);
+                document.getElementById('loading').classList.replace('flex', 'hidden');
+                alert("Ocorreu um erro ao gerar as receitas.\nVerifique se sua API Key é válida e se tem cota disponível.");
+            }
+        }
+
+        // Renderizar Cards
+        function renderRecipes() {
+            const container = document.getElementById('recipes-grid');
+            container.innerHTML = ''; 
+
+            if(!currentRecipes || currentRecipes.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">Nenhuma receita encontrada.</p>';
+                return;
+            }
+
+            currentRecipes.forEach((recipe) => {
+                const html = `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-3">
+                            <h4 class="font-bold text-lg text-brand-black">${recipe.title}</h4>
+                            <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">IA</span>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-1">Falta comprar:</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${recipe.missing.length > 0 
+                                    ? recipe.missing.map(item => `<span class="text-sm text-red-500 bg-red-50 px-2 py-0.5 rounded-md">• ${item}</span>`).join('') 
+                                    : '<span class="text-sm text-green-600 bg-green-50 px-2 py-0.5 rounded-md">Tudo ok!</span>'}
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-1">Preparo:</p>
+                            <ol class="text-sm text-gray-600 list-decimal list-inside space-y-1">
+                                ${recipe.steps.map(step => `<li>${step}</li>`).join('')}
+                            </ol>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+        }
+
+        // Função: Gerar Lista de Compras
+        function generateShoppingList() {
+            const container = document.getElementById('shopping-list-container');
+            const content = document.getElementById('shopping-list-content');
+            
+            let allMissingItems = [];
+            currentRecipes.forEach(r => {
+                if(r.missing && Array.isArray(r.missing)) {
+                    allMissingItems.push(...r.missing);
+                }
+            });
+            
+            // Remover duplicatas e normalizar
+            allMissingItems = [...new Set(allMissingItems.map(i => i.trim()))];
+
+            // Categorização simples (Frontend puro)
+            const categories = {
+                'Hortifruti 🥦': [],
+                'Açougue & Frios 🥩': [],
+                'Grãos & Mercearia 🍞': [],
+                'Outros 🧂': []
+            };
+
+            allMissingItems.forEach(item => {
+                const lower = item.toLowerCase();
+                if(lower.match(/alface|cenoura|batata|salsinha|alho|cebola|tomate|fruta|limão|pimentão|abobrinha/)) {
+                    categories['Hortifruti 🥦'].push(item);
+                } else if (lower.match(/queijo|manteiga|caldo|carne|frango|ovo|leite|presunto|bacon|peixe/)) {
+                    categories['Açougue & Frios 🥩'].push(item);
+                } else if (lower.match(/croutons|vinho|arroz|feijão|macarrão|farinha|açúcar|óleo|azeite|molho/)) {
+                    categories['Grãos & Mercearia 🍞'].push(item);
+                } else {
+                    categories['Outros 🧂'].push(item);
+                }
+            });
+
+            // Renderizar HTML
+            content.innerHTML = '';
+            let hasItems = false;
+            for (const [catName, items] of Object.entries(categories)) {
+                if(items.length > 0) {
+                    hasItems = true;
+                    content.innerHTML += `
+                        <div>
+                            <h5 class="text-brand-green font-semibold mb-2 uppercase text-sm tracking-widest">${catName}</h5>
+                            <ul class="space-y-2">
+                                ${items.map(i => `<li class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-white rounded-full"></div> ${i}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+            }
+
+            if(!hasItems) {
+                content.innerHTML = '<p class="text-white text-opacity-80 col-span-2 text-center">Nenhum ingrediente faltando. Parabéns!</p>';
+            }
+
+            container.classList.remove('hidden');
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Função: Exportar PDF
+        function exportPDF() {
+            const element = document.getElementById('dashboard');
+            
+            const opt = {
+                margin:       0.5,
+                filename:     'Minha_Lista_CookMe.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            const btns = document.querySelectorAll('button');
+            btns.forEach(b => b.style.display = 'none');
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                btns.forEach(b => b.style.display = 'inline-block');
+                document.getElementById('btn-shopping-list').style.display = 'inline-block'; 
+            });
+        }
+    </script>
+</body>
+</html>
